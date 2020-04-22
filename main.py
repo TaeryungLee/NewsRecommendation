@@ -180,7 +180,6 @@ for fn in filenames:
             if keyword not in stopword and len(keyword) > 3:
                 keywords.append(keyword)
         testarticles.append((articleid, headline, wordcount, keywords, pubdate))
-
 # Loading done, record time
 loadtime = datetime.datetime.now()
 print("Loading done. Loading time: ", loadtime - start)
@@ -207,11 +206,13 @@ for userid in alluserids:
 # Target user ids saved in userid.txt due to long runtime
 with open("userid.txt", 'r') as f:
     userids = f.read().split("\n")
+rawtargetTrainComments = {}
+rawtargetTestComments = {}
 targetTrainComments = {}
 targetTestComments = {}
 for userid in userids:
-    targetTrainComments[userid] = traincomments[userid]
-    targetTestComments[userid] = testcomments[userid]
+    rawtargetTrainComments[userid] = traincomments[userid]
+    rawtargetTestComments[userid] = testcomments[userid]
 
 # 2. Keyword preprocessing
 # 2.1 Form a set of keywords
@@ -221,7 +222,7 @@ articlekeywords = {}
 for article in trainarticles:
     keywords = article[3]
     articleid = article[0]
-    articlekeywords[articleid] = keywords.copy()
+    articlekeywords[articleid] = [keyword.lower() for keyword in keywords]
     for keyword in keywords:
         if keyword not in keywordset:
             keywordset.append(keyword.lower())
@@ -229,9 +230,20 @@ for article in trainarticles:
 for article in testarticles:
     keywords = article[3]
     articleid = article[0]
+    articlekeywords[articleid] = [keyword.lower() for keyword in keywords]
     for keyword in keywords:
         if keyword not in keywordset:
             keywordset.append(keyword.lower())
+
+for userid in userids:
+    targetTrainComments[userid] = []
+    targetTestComments[userid] = []
+    for comment in rawtargetTrainComments[userid]:
+        if comment[0] in articlekeywords.keys():
+            targetTrainComments[userid].append(comment)
+    for comment in rawtargetTestComments[userid]:
+        if comment[0] in articlekeywords.keys():
+            targetTestComments[userid].append(comment)
 
 # 2.2 Count co-occurrence in keyword set
 
@@ -270,7 +282,7 @@ print("Preprocessing done. Preprocessing time: ", preptime - loadtime)
 # Output data format: Dictionary
 # keywordpreference[commentid] = 0~1사이의 정수값
 
-keywordPreference = keywordanalysis(coOccurrence, userids, traincomments, articlekeywords)
+keywordPreference = keywordanalysis(userids, targetTrainComments, articlekeywords)
 
 # 2. Sentiment polarity based
 # Used data:
@@ -282,20 +294,91 @@ keywordPreference = keywordanalysis(coOccurrence, userids, traincomments, articl
 # Output data format: Dictionary
 # sentimentpreference[commentid] = (pos: 0~1사이의 정수값, neu: 0~1사이의 정수값, neg: 0~1사이의 정수값) (softmax)
 
-sentimentPreference = sentimentanalysis(userids, traincomments)
+sentimentPreference = sentimentanalysis(userids, targetTrainComments)
+
+# Keyword, Sentiment analysis done
+preftime = datetime.datetime.now()
+print("Keyword, Sentiment analysis done. Analysis time: ", preftime - preptime)
 
 # 3. Preference on keywords
+# keyword base: 기본점수 1점, keyword 연관성 0~2점
+# sentiment base: pos 2점, neg 1점, neu 0점
+userPrefKeyword = {}
 
+for userid in userids:
+    userPrefKeyword[userid] = {}
+    for comment in targetTrainComments[userid]:
+        articleid = comment[0]
+        commentid = comment[2]
+        keywords = articlekeywords[articleid]
+        keywordpref = keywordPreference[commentid]
+        sentimentpref = sentimentPreference[commentid]
+        preference = (1 + 2 * keywordpref) + (2 * sentimentpref['pos'] + 1 * sentimentpref['neg'])
+        for keyword in keywords:
+            if keyword not in userPrefKeyword[userid].keys():
+                userPrefKeyword[userid][keyword] = preference
+            else:
+                userPrefKeyword[userid][keyword] += preference
+
+    # Normalize
+    sums = 0
+    for keyword in userPrefKeyword[userid].keys():
+        sums += userPrefKeyword[userid][keyword]
+
+    for keyword in userPrefKeyword[userid].keys():
+        userPrefKeyword[userid][keyword] = userPrefKeyword[userid][keyword] / sums
+
+# Keyword preference analysis done
+kwdtime = datetime.datetime.now()
+print("Keyword preference analysis done. Analysis time: ", kwdtime - preftime)
+
+# User preference on unseen articles
+userPrefArticle = {}
+for userid in userids:
+    userPrefArticle[userid] = {}
+    for article in testarticles:
+        articleid = article[0]
+        prefsum = 0
+        for keyword in articlekeywords[articleid]:
+            if keyword in userPrefKeyword.keys():
+                prefsum += userPrefKeyword[keyword]
+        userPrefArticle[userid][articleid] = prefsum
+
+# Article preference analysis done
+articletime = datetime.datetime.now()
+print("Article preference analysis done. Analysis time: ", articletime - kwdtime)
 
 # News recommendation based on preference
+recommend = {}
+for userid in userids:
+    pref = userPrefArticle[userid]
+    prefsort = sorted(pref.items(), key=lambda x: x[1], reverse=True)
+    recommend[userid] = prefsort[:100]
 
+# Recommendation done
+rectime = datetime.datetime.now()
+print("Recommendation done. Recommendation time: ", rectime - articletime)
 
 # Evaluation
+groundtruth = {}
+for userid in userids:
+    groundtruth[userid] = []
+    for comment in targetTestComments[userid]:
+        groundtruth[userid].append(comment[0])
 
+accuracy = {}
+sums = 0
+for userid in userids:
+    acc = 0
+    for recom in recommend[userid]:
+        if recom[0] in groundtruth[userid]:
+            acc += 1
 
+    accuracy[userid] = acc / len(recommend[userid])
+    sums += acc / len(recommend[userid])
 
-
-
+print(accuracy)
+print(sums/len(userids))
 
 
 
