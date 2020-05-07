@@ -283,6 +283,8 @@ print("Preprocessing done. Preprocessing time: ", preptime - loadtime)
 # keywordpreference[commentid] = 0~1사이의 정수값
 
 keywordPreference = keywordanalysis(userids, targetTrainComments, articlekeywords)
+sum = 0
+count = 0
 
 # 2. Sentiment polarity based
 # Used data:
@@ -313,7 +315,10 @@ for userid in userids:
         keywords = articlekeywords[articleid]
         keywordpref = keywordPreference[commentid]
         sentimentpref = sentimentPreference[commentid]
-        preference = (1 + 2 * keywordpref) + (2 * sentimentpref['pos'] + 1 * sentimentpref['neg'])
+        sentimentPoint = 0
+        if sentimentpref['pos'] > 0.8 or sentimentpref['pos'] < 0.2:
+            sentimentPoint = max(sentimentpref['pos'], sentimentpref['neg'])
+        preference = (1.6 + 5000 * keywordpref) + (2 * sentimentPoint)
         for keyword in keywords:
             if keyword not in userPrefKeyword[userid].keys():
                 userPrefKeyword[userid][keyword] = preference
@@ -341,7 +346,7 @@ for userid in userids:
         prefsum = 0
         for keyword in articlekeywords[articleid]:
             if keyword in userPrefKeyword.keys():
-                prefsum += userPrefKeyword[keyword]
+                prefsum += userPrefKeyword[userid][keyword] / len(articlekeywords[articleid])
         userPrefArticle[userid][articleid] = prefsum
 
 # Article preference analysis done
@@ -379,45 +384,3 @@ for userid in userids:
 
 print(accuracy)
 print(sums/len(userids))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
