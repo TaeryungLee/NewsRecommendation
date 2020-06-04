@@ -1,0 +1,4 @@
+nltk
+parmap
+matplotlib
+numpy
