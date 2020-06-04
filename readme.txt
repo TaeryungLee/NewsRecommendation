@@ -2,6 +2,10 @@ NYT Comments Dataset: https://www.kaggle.com/aashita/nyt-comments
 
 Unzip nyt.zip, txt_sentoken.zip into main working directory.
 
+Code based on python 3.8.
+
+requirements can be installed by "pip install -r requirements.txt".
+
 Time-consuming works are saved in pickle files, automatically loaded while running main.py.
 
 Delete pickle files to run from base.
