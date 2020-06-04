@@ -6,6 +6,12 @@ Code based on python 3.8.
 
 requirements can be installed by "pip install -r requirements.txt".
 
+NLTK components must be downloaded before running the code.
+
+Can be downloaded in python code:
+         import nltk
+         nltk.download()
+
 Time-consuming works are saved in pickle files, automatically loaded while running main.py.
 
 Delete pickle files to run from base.
